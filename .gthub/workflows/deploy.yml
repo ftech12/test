@@ -19,27 +19,25 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Create frontend .env file
-        working-directory: /
+      - name: Create .env file for Vite
         run: |
-          echo "REACT_APP_NODE_URL=${{ secrets.REACT_APP_NODE_URL }}" >> .env
-       
+          echo "VITE_NODE_URL=${{ secrets.REACT_APP_NODE_URL }}" > .env
 
-      - name: Install frontend dependencies
-        working-directory: ./
+      - name: Install dependencies
         run: npm install
 
-      - name: Build frontend
-        working-directory: ./client
+      - name: Build Vite app
         run: npm run build
 
-      - name: Deploy to EC2
+      - name: Upload build folder to EC2
+        run: |
+          scp -r dist ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/ubuntu/cicd
+
+      - name: Restart PM2 (optional backend or static server)
         run: |
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            cd /home/ubuntu/cicd || git clone https://github.com/ftech12/test.git cicd && cd cicd
-            git pull origin main
-            npm install
-            npm run build   # or npm start, depending on your app
-            pm2 restart all || pm2 start npm --name "app-name" -- start
+            cd /home/ubuntu/cicd
+            # If you're using serve, uncomment below:
+            # pm2 restart vite-app || pm2 start npx --name "vite-app" -- serve -s dist -l 3000
+            # If you're using Nginx, you don’t need pm2
           EOF
- 
