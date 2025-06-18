@@ -28,3 +28,4 @@ jobs:
             npm run build   # or npm start, depending on your app
             pm2 restart all || pm2 start npm --name "app-name" -- start
           EOF
+ 
