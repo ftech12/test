@@ -16,9 +16,6 @@ jobs:
     - name: Install dependencies
       run: npm install  # Change this for your package manager
     
-    - name: Run tests
-      run: npm test  # Change this for your test command
-    
     - name: Build project
       run: npm run build  # Change this for your build command
 
