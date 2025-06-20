@@ -1,43 +1,46 @@
-name: Deploy to EC2
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]  
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - uses: actions/checkout@v2
+    
+    - name: Install dependencies
+      run: npm install  # Change this for your package manager
+    
+    - name: Run tests
+      run: npm test  # Change this for your test command
+    
+    - name: Build project
+      run: npm run build  # Change this for your build command
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Create .env file for Vite
-        run: |
-          echo "VITE_NODE_URL=${{ secrets.REACT_APP_NODE_URL }}" > .env
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build Vite app
-        run: npm run build
-
-      - name: Upload build folder to EC2
-        run: |
-          scp -r dist ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/ubuntu/cicd
-
-      - name: Restart PM2 (optional backend or static server)
-        run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            cd /home/ubuntu/cicd
-            # If you're using serve, uncomment below:
-            # pm2 restart vite-app || pm2 start npx --name "vite-app" -- serve -s dist -l 3000
-            # If you're using Nginx, you don’t need pm2
-          EOF
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Install SSH key
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{ secrets.AWS_EC2_SSH_KEY }}
+        known_hosts: 'just-a-placeholder-so-we-dont-get-errors'
+    
+    - name: Deploy to EC2
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.AWS_EC2_USER }}@${{ secrets.AWS_EC2_HOST }} << 'ENDSSH'
+          cd /var/www/your-project
+          git pull origin main
+          npm install --production
+          npm run build
+          sudo systemctl restart nginx
+        ENDSSH
