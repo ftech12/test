@@ -7,6 +7,7 @@ function Index() {
   return (
     <div>
         <Header/>
+        <h2>hi test</h2>
         <Outlet/>
         <Fotter/>
     </div>
