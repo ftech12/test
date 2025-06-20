@@ -9,35 +9,35 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v2
-    
-    - name: Install dependencies
-      run: npm install  # Change this for your package manager
-    
-    - name: Build project
-      run: npm run build  # Change this for your build command
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    
     steps:
-    - uses: actions/checkout@v2
-    
-    - name: Install SSH key
-      uses: shimataro/ssh-key-action@v2
-      with:
-        key: ${{ secrets.AWS_EC2_SSH_KEY }}
-        known_hosts: 'just-a-placeholder-so-we-dont-get-errors'
-    
-    - name: Deploy to EC2
-      run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.AWS_EC2_USER }}@${{ secrets.AWS_EC2_HOST }} << 'ENDSSH'
-          cd /var/www/your-project
-          git pull origin main
-          npm install --production
-          npm run build
-          sudo systemctl restart nginx
-        ENDSSH
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build project
+        run: npm run build
+
+      - name: Upload build to EC2
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.AWS_EC2_HOST }}
+          username: ${{ secrets.AWS_EC2_USER }}
+          key: ${{ secrets.AWS_EC2_SSH_KEY }}
+          port: 22
+          source: "dist/*"
+          target: "/home/deploy/app"
+
+      - name: Restart app on EC2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.AWS_EC2_HOST }}
+          username: ${{ secrets.AWS_EC2_USER }}
+          key: ${{ secrets.AWS_EC2_SSH_KEY }}
+          port: 22
+          script: |
+            cd /home/deploy/app
+            fuser -k 3000/tcp || true
+            nohup npx serve -s . -l 3000 > app.log 2>&1 &
